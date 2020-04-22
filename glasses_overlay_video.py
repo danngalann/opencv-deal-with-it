@@ -53,14 +53,21 @@ detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(config["landmark_predictor"])
 debug = True
 fvs = FileVideoStream("obama.mp4").start()
+videoWriter = cv2.VideoWriter('output.mp4', cv2.VideoWriter_fourcc(*'MJPG'), 30, (640, 480), True)
+debugVideoWriter = cv2.VideoWriter('debug.mp4', cv2.VideoWriter_fourcc(*'MJPG'), 30, (640, 480), True) if debug else None
 
 # Preprocess mask
 sgMaskOrig = cv2.cvtColor(sgMaskOrig, cv2.COLOR_BGR2GRAY)
 sgMaskOrig = cv2.threshold(sgMaskOrig, 0, 255, cv2.THRESH_BINARY)[1]
 
-while fvs.running():
+while True:
+
     frame = fvs.read()
-    frame = imutils.resize(frame, width=500)
+
+    if type(frame) is not np.ndarray:
+        break
+
+    # frame = imutils.resize(frame, width=300)
     frame = cv2.flip(frame, 1)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -99,8 +106,7 @@ while fvs.running():
         # width
         sgW = int(w * 0.9)
         sgH = int(h * 0.2)
-        glasses = cv2.resize(sgOrig, (sgW, sgH))
-        
+        glasses = cv2.resize(sgOrig, (sgW, sgH))        
 
         # our sunglasses contain transparency (the bottom parts, underneath
         # the lenses and nose) so in order to achieve that transparency in
@@ -131,9 +137,11 @@ while fvs.running():
 
             
     if len(faces) > 0:
+        videoWriter.write(output)
         cv2.imshow("Output", output)
 
     if debug:
+        debugVideoWriter.write(frame)
         cv2.imshow("Frame", frame)
         
     key = cv2.waitKey(1) & 0xFF 
