@@ -29,6 +29,22 @@ def overlay_image(bg, fg, fgMask, coords):
 
     return output
 
+def alpha_blend(fg, bg, alpha):
+    # convert the foreground, background, and alpha layers from
+    # unsigned 8-bit integers to floats, making sure to scale the
+    # alpha layer to the range [0, 1]
+    fg = fg.astype("float")
+    bg = bg.astype("float")
+    alpha = alpha.astype("float") / 255
+    # perform alpha blending
+    fg = cv2.multiply(alpha, fg)
+    bg = cv2.multiply(1 - alpha, bg)
+    # add the foreground and background to obtain the final output
+    # image
+    output = cv2.add(fg, bg)
+    
+    return output.astype("uint8")
+
 vs = WebcamVideoStream(src=0).start()
 
 while True:
