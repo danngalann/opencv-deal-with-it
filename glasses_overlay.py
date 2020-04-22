@@ -47,16 +47,20 @@ def alpha_blend(fg, bg, alpha):
 
 # Variables
 config = json.loads(open("config.json").read())
-glasses = cv2.imread(config["sunglasses"])
-glassesMask = cv2.imread(config["sunglasses_mask"])
+sgOrig = cv2.imread(config["sunglasses"])
+sgMaskOrig = cv2.imread(config["sunglasses_mask"])
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(config["landmark_predictor"])
 debug = True
 vs = WebcamVideoStream(src=0).start()
 
+# Preprocess mask
+sgMaskOrig = cv2.cvtColor(sgMaskOrig, cv2.COLOR_BGR2GRAY)
+sgMaskOrig = cv2.threshold(sgMaskOrig, 0, 255, cv2.THRESH_BINARY)[1]
+
 while True:
     frame = vs.read()
-    frame = imutils.resize(frame, width=600)
+    # frame = imutils.resize(frame, width=600)
     frame = cv2.flip(frame, 1)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -76,12 +80,62 @@ while True:
         leftEyePts = shape[lStart:lEnd]
         rightEyePts = shape[rStart:rEnd]
 
-        if debug:
-            cv2.rectangle(frame, (x, y), (x + w, y + h), (0,255,0), 2)
-            for (x, y) in shape:
-                cv2.circle(frame, (x, y), 1, (0, 0, 255), -1)
+        # compute the center of mass for each eye
+        leftEyeCenter = leftEyePts.mean(axis=0).astype("int")
+        rightEyeCenter = rightEyePts.mean(axis=0).astype("int")
 
-    cv2.imshow("Frame", frame)
+        # compute the angle between the eye center
+        dY = rightEyeCenter[1] - leftEyeCenter[1]
+        dX = rightEyeCenter[0] - leftEyeCenter[0]
+        angle = np.degrees(np.arctan2(dY, dX)) - 180
+
+        # rotate the sunglasses image by our computed angle, ensuring the
+        # sunglasses will align with how the head is tilted
+        # glasses = imutils.rotate_bound(sgOrig, angle)
+
+        # the sunglasses shouldn't be the *entire* width of the face and
+        # ideally should just cover the eyes -- here we'll do a quick
+        # approximation and use 90% of the face width for the sunglasses
+        # width
+        sgW = int(w * 0.9)
+        sgH = int(h * 0.2)
+        glasses = cv2.resize(sgOrig, (sgW, sgH))
+        
+
+        # our sunglasses contain transparency (the bottom parts, underneath
+        # the lenses and nose) so in order to achieve that transparency in
+        # the output image we need a mask which we'll use in conjunction with
+        # alpha blending to obtain the desired result -- here we're binarizing
+        # our mask and performing the same image processing operations as
+        # above        
+        # glassesMask = imutils.rotate_bound(sgMaskOrig, angle)
+        glassesMask = cv2.resize(sgMaskOrig, (sgW, sgH))
+
+        output = overlay_image(frame, glasses, glassesMask, (x, y + int(h*0.2)))
+
+        if debug:
+            # Draw face rectangle
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0,255,0), 1)
+
+            # Draw landmarks in red
+            for (x, y) in shape:
+                if (x,y) not in leftEyePts and (x,y) not in rightEyePts:
+                    cv2.circle(frame, (x, y), 1, (0, 255, 255), -1)
+
+            # Draw landmarks of the eyes in green
+            for (x,y) in leftEyePts:
+                cv2.circle(frame, (x, y), 1, (0, 255, 0), -1)
+
+            for (x,y) in rightEyePts:
+                cv2.circle(frame, (x, y), 1, (0, 255, 0), -1)
+
+            
+    if len(faces) > 0:
+        cv2.imshow("Output", output)
+
+    if debug:
+        cv2.imshow("Frame", frame)
+        
     key = cv2.waitKey(1) & 0xFF 
     
     if key == ord("q"):
