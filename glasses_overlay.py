@@ -45,6 +45,12 @@ def alpha_blend(fg, bg, alpha):
     
     return output.astype("uint8")
 
+# Variables
+config = json.loads(open("config.json".read()))
+glasses = cv2.imread(config["sunglasses"])
+glassesMask = cv2.imread(config["sunglasses_mask"])
+detector = cv2.dnn.readNetFromCaffe(config["face_detector_prototxt"], config["face_detector_weights"])
+predictor = dlib.shape_predictor(config["landmark_predictor"])
 vs = WebcamVideoStream(src=0).start()
 
 while True:
