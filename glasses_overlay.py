@@ -46,17 +46,40 @@ def alpha_blend(fg, bg, alpha):
     return output.astype("uint8")
 
 # Variables
-config = json.loads(open("config.json".read()))
+config = json.loads(open("config.json").read())
 glasses = cv2.imread(config["sunglasses"])
 glassesMask = cv2.imread(config["sunglasses_mask"])
-detector = cv2.dnn.readNetFromCaffe(config["face_detector_prototxt"], config["face_detector_weights"])
+detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(config["landmark_predictor"])
+debug = True
 vs = WebcamVideoStream(src=0).start()
 
 while True:
     frame = vs.read()
-    frame = imutils.resize(frame, width=400)
+    frame = imutils.resize(frame, width=600)
     frame = cv2.flip(frame, 1)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Detect faces
+    faces = detector(gray, 0)
+
+    for face in faces:
+        x, y, w, h = face.left(), face.top(), face.width(), face.height()       
+
+        shape = predictor(gray, face)
+        shape = face_utils.shape_to_np(shape)
+
+        # grab the indexes of the facial landmarks for the left and right
+        # eye, respectively, then extract (x, y)-coordinates for each eye
+        (lStart, lEnd) = face_utils.FACIAL_LANDMARKS_IDXS["left_eye"]
+        (rStart, rEnd) = face_utils.FACIAL_LANDMARKS_IDXS["right_eye"]
+        leftEyePts = shape[lStart:lEnd]
+        rightEyePts = shape[rStart:rEnd]
+
+        if debug:
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0,255,0), 2)
+            for (x, y) in shape:
+                cv2.circle(frame, (x, y), 1, (0, 0, 255), -1)
 
     cv2.imshow("Frame", frame)
     key = cv2.waitKey(1) & 0xFF 
